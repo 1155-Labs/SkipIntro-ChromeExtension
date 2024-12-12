@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "Skip Intro - No Name Labs",
+  "version": "1.2",
+  "description": "Automatically skips intros, recaps, and ads on Netflix, Hotstar, Prime Video, and more. Now compatible with multiple languages!",
+  "permissions": ["activeTab", "storage"],
+  "host_permissions": [
+    "https://www.netflix.com/*",
+    "https://www.hotstar.com/*",
+    "https://*.primevideo.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.netflix.com/*",
+        "https://www.hotstar.com/*",
+        "https://*.primevideo.com/*"
+      ],
+      "js": ["content.js"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icon.png"
+  },
+  "icons": {
+    "48": "icon.png"
+  }
+}
