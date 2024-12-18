@@ -6,7 +6,7 @@ body {
     text-align: -webkit-center;
     background: rgba(000, 000, 000, 0.01);
     color: white;
-    max-height: 410px;
+    height: 344px;
     /* border-bottom-left-radius: 15px; */
     /* border-bottom-right-radius: 15px; */
     background-color: #020202;
@@ -32,13 +32,13 @@ button {
 
 #remote-control {
   display: flex;
-  /* flex-direction: column; */
-  justify-content: space-between;
+    /* flex-direction: column; */
+    justify-content: space-between;
     align-items: flex-start;
-  /* border-top-left-radius: 15px; */
-  /* border-top-right-radius: 15px; */
-  margin: 18px;
-  margin-right: 23px;
+    /* border-top-left-radius: 15px; */
+    /* border-top-right-radius: 15px; */
+    margin: 5px;
+    margin-right: 14px;
 } 
 
 
@@ -61,19 +61,18 @@ button {
 }
 
 main {
-  height: 278px;
-  display: flex
-;
+  display: flex;
     flex-direction: column;
     justify-content: space-between;
     align-items: center;
-    padding: 4px;
-
+    padding: 5px;
+    padding-top: 8px;
+    gap: 13px;
 }
 
 #remote-wrapper-background {
   width: 222px;
-  height: 227px;
+  /* height: 227px; */
 
   /* background: #000000; */
   /* border-radius: 41px; */
@@ -118,17 +117,16 @@ border-top-right-radius: 11px;
   display: flex
 ;
     justify-content: center;
-    align-items: end;
+    align-items: center;
     /* flex-direction: column; */
     gap: 4px;
     background: #292929;
-    height: 73px;
-    width: 207px;
+    height: 28px;
+    width: 198px;
     z-index: -1;
-    padding-bottom: 20px;
-    border-bottom-right-radius: 16px;
-    border-bottom-left-radius: 16px;
-    margin-top: -89px;
+    padding-bottom: 0px;
+    border-radius: 16px;
+    margin-top: 0px;
 }
 
 /* .toggle-button{
@@ -179,7 +177,9 @@ opacity: 0.4;
 
 
 #footer {
-  margin-top: 63px;
+  /* margin-top: 63px; */
+  position: absolute;
+  bottom: 0px;;
 }
 
 
@@ -198,19 +198,26 @@ opacity: 0.4;
 
 #toggle-button-wrapper {
   display: flex
-  ;
-      flex-direction: row;
-      width: 191px;
-      height: 88px;
-      justify-content: flex-start;
-      align-items: end;
-      background-color: #2A2959;
-      border-radius: 47px;
-      margin-top: -12px;
-      padding-left: 11px;
-      padding-right: 11px;
-      background: url(./assets/remote/darkmode/switch_off_bg.jpg) no-repeat;
-      background-size: cover
+;
+    flex-direction: row;
+    width: 208px;
+    height: 88px;
+    justify-content: flex-start;
+    align-items: end;
+    background-color: #2A2959;
+    border-radius: 48.89px;
+    margin-top: 5px;
+    /* padding-left: 11px; */
+    /* padding-right: 11px; */
+    background: url(./assets/remote/darkmode/switch_off_bg.jpg) no-repeat;
+    background-size: cover;
+    align-self: center;
+    align-items: center;
+}
+
+#toggle-button-switch {
+  height: 79px;
+    width: 96px;
 }
 /* glow
 #toggle-track {
