@@ -11,6 +11,7 @@ body {
     /* border-bottom-right-radius: 15px; */
     background-color: #020202;
     user-select: none;
+    
 }
 
 
@@ -103,7 +104,7 @@ border-top-right-radius: 11px;
   height: 206px;
   background: linear-gradient(180deg, #E695AB 0%, #E7B199 100%);
 
-  border-radius: 46px;
+  border-radius: 48.89px;
   display: flex;
       flex-direction: column;
       justify-content: space-around;
@@ -111,6 +112,7 @@ border-top-right-radius: 11px;
       border-top-right-radius: 11px;
       /* margin-left: 3px; */
       /* margin-right: 3px; */
+  transition: background 300ms ease-in-out;
 }
 
 #misc-controls{
@@ -132,7 +134,7 @@ border-top-right-radius: 11px;
 /* .toggle-button{
   max-width: 190px;
 } */
-#misc-value{
+#misc-controls, #misc-value{
 font-family: 'Montserrat';
 font-style: bold;
 font-weight: 700;
@@ -177,9 +179,13 @@ opacity: 0.4;
 
 
 #footer {
-  /* margin-top: 63px; */
   position: absolute;
-  bottom: 0px;;
+    bottom: 0px;
+    background: url('../assets/remote/darkmode/footer.png');
+    width: 235px;
+    height: 24px;
+    background-repeat: no-repeat;
+    background-size: contain;
 }
 
 
@@ -206,18 +212,26 @@ opacity: 0.4;
     align-items: end;
     background-color: #2A2959;
     border-radius: 48.89px;
-    margin-top: 5px;
+    margin-top: 8px;
     /* padding-left: 11px; */
     /* padding-right: 11px; */
-    background: url(./assets/remote/darkmode/switch_off_bg.jpg) no-repeat;
+    background: url(../assets/remote/darkmode/switch_on_bg.png);
     background-size: cover;
     align-self: center;
     align-items: center;
+    background-repeat: no-repeat;
+    transition: 300ms ease-in-out;
+
 }
 
 #toggle-button-switch {
-  height: 79px;
-    width: 96px;
+  height: 76.8px;
+    width: 76.8px;
+    background: url(../assets/remote/darkmode/switch_off_2x.png) no-repeat center;
+    border-radius: 50px;
+    margin-left: 6px;
+    margin-right: 6px;
+    background-size: cover;
 }
 /* glow
 #toggle-track {
@@ -245,88 +259,3 @@ top: 4px;
 
 
 
-
-.switch{
-  position: relative;
-  width: 191px;
-  height: 91px;
-  margin: 0px;
-  appearance: none;
-  -webkit-appearance: none;
-  background-image:url('./assets/remote/darkmode/download.png');
-  background-size: cover;
-  background-repeat: no-repeat;
-  border-radius: 47px;
-  box-shadow: inset 0px 0px 2px rgba(255,255,255,.7);
-  transition: background-image .7s ease-in-out;
-  outline: none;
-  cursor: pointer;
-  overflow: hidden;
-}
-  
-.switch:checked{
-  width: 191px;
-  height: 91px;
-  margin: 0px;
-  background-image: url('./assets/remote/darkmode/switch_on_bg.jpg');
-  background-size: cover;
-  transition: background-image 1s ease-in-out;
-
-
-}
-
-.switch:after{
-  content: '';
-  width: 85px;
-  height:85px;
-  border-radius: 50%;
-  background-image: url('./assets/remote/darkmode/switch_off.png');
-  background-size: cover;
-
-  /* background-color: #fff; */
-  position: absolute;
-  left: 6px;
-  top: 4px;
-  transform: translateX(0px);
-  animation: off .7s forwards cubic-bezier(1, .2, .2, 1);
-  /* box-shadow: inset 0 0 0 0em rgba(255, 255, 255, 0.3),2px 2px 2px 2px rgba(255, 255, 255, 0.3); */
-  }
-
-@keyframes off{
-  0%{
-      transform: translateX(100px);
-      /* -moz-transform: rotate(360deg); */
-      width: 85px;
-  }
-  50%{
-      width: 85px;  
-      border-radius: 25px;   
-  }
-  100%{
-      transform: translateX(0px); 
-      width: 85px;
-  }
-}
-  
-.switch:checked:after{
-  animation: on .7s forwards cubic-bezier(1, .2, .2, 1);
-  /* box-shadow: inset -5px -5px 4px rgba(255, 255, 255, 0.3); */
-  }
-
-@keyframes on{
-  0%{
-  transform: translateX(0px);
-  width: 85px;
-  box-shadow: inset -5px -5px 4px rgba(255, 255, 255, 0.01);
-  }
-  50%{
-      width: 85px;  
-      /* border-radius: 25px;    */
-      box-shadow: inset -5px -5px 4px rgba(255, 255, 255, 0.2);
-  }
-  100%{
-  transform: translateX(100px); 
-  width: 85px;
-  box-shadow: inset 5px -5px -4px rgba(255, 255, 255, 0.3);
-  }
-}

@@ -54,51 +54,6 @@ function addShowToHistory(showInfo) {
   });
 }
 
-// Fix the incomplete captureShowInfo function
-function captureShowInfo(callback) {
-    const observer = new MutationObserver((mutations) => {
-        const titleElement = document.querySelector('div[data-uia="video-title"]');
-        
-        if (titleElement) {
-            const showName = titleElement.querySelector('h4')?.textContent || '';
-            const episodeNumber = titleElement.querySelector('span:first-of-type')?.textContent || '';
-            const episodeTitle = titleElement.querySelector('span:last-of-type')?.textContent || '';
-
-            const videoInfo = {
-                show: showName,
-                episode: episodeNumber,
-                title: episodeTitle,
-                fullTitle: `${showName} - ${episodeNumber} - ${episodeTitle}`.trim()
-            };
-
-            // Call the callback with the detailed info
-            callback(videoInfo.fullTitle);
-            
-            // Also store the detailed info
-            addShowToHistory(videoInfo);
-            
-            observer.disconnect();
-        } else {
-            // Fallback to original method if Netflix UI changes
-            const showTitle = document.querySelector('h1')?.textContent || 
-                            document.querySelector('.video-title')?.textContent ||
-                            document.title.split('-')[0].trim();
-            
-            if (showTitle && showTitle !== 'Netflix') {
-                callback(showTitle);
-                addShowToHistory(showTitle);
-                observer.disconnect();
-            }
-        }
-    });
-
-    observer.observe(document, {
-        subtree: true,
-        childList: true,
-        attributes: true
-    });
-}
-
 // Function to check and click "Skip" buttons
 function clickSkipButtons() {
   if (!document.body) return;
@@ -143,45 +98,6 @@ function clickSkipButtons() {
           console.log('Captured show title:', showTitle);
         }
       }
-      // Updated show information capture using the Netflix title structure
-      // const showobserver = new MutationObserver((mutations) => {
-      //   const titleElement = document.querySelector('div[data-uia="video-title"]');
-        
-      //   if (titleElement) {
-      //     const showName = titleElement.querySelector('h4')?.textContent || '';
-      //     const episodeNumber = titleElement.querySelector('span:first-of-type')?.textContent || '';
-      //     const episodeTitle = titleElement.querySelector('span:last-of-type')?.textContent || '';
-
-      //     const videoInfo = {
-      //       show: showName,
-      //       episode: episodeNumber,
-      //       title: episodeTitle,
-      //       fullTitle: `${showName} - ${episodeNumber} - ${episodeTitle}`.trim()
-      //     };
-
-      //     addShowToHistory(videoInfo);
-      //     console.log('Captured show details:', videoInfo);
-      //     showobserver.disconnect();
-      //   } else {
-      //     // Fallback to existing method if new structure isn't found
-      //     const showTitle = document.querySelector('h1')?.textContent || 
-      //                      document.querySelector('.video-title')?.textContent ||
-      //                      document.title.split('-')[0].trim();
-          
-      //     if (showTitle && showTitle !== 'Netflix') {
-      //       addShowToHistory(showTitle);
-      //       console.log('Captured show title:', showTitle);
-      //       showobserver.disconnect();
-      //     }
-      //   }
-      // });
-
-      // showobserver.observe(document, {
-      //   childList: true,
-      //   subtree: true,
-      //   attributes: true,
-      //   characterData: true
-      // });
       
     }
   });
@@ -260,37 +176,37 @@ function initializeObserver(retryCount = 0) {
   console.log("Skip Intro initialization handlers set up complete");
 })();
 
-function getVideoDetails() {
-    const targetNode = document.querySelector('div[data-uia="video-title"]');
+// function getVideoDetails() {
+//     const targetNode = document.querySelector('div[data-uia="video-title"]');
     
-    const observer = new MutationObserver((mutations) => {
-        const titleElement = document.querySelector('div[data-uia="video-title"]');
-        if (titleElement) {
-            const showName = titleElement.querySelector('h4')?.textContent || '';
-            const episodeNumber = titleElement.querySelector('span:first-of-type')?.textContent || '';
-            const episodeTitle = titleElement.querySelector('span:last-of-type')?.textContent || '';
+//     const observer = new MutationObserver((mutations) => {
+//         const titleElement = document.querySelector('div[data-uia="video-title"]');
+//         if (titleElement) {
+//             const showName = titleElement.querySelector('h4')?.textContent || '';
+//             const episodeNumber = titleElement.querySelector('span:first-of-type')?.textContent || '';
+//             const episodeTitle = titleElement.querySelector('span:last-of-type')?.textContent || '';
 
-            const videoInfo = {
-                show: showName,         // "The Office (U.S.)"
-                episode: episodeNumber, // "E1"
-                title: episodeTitle     // "The Dundies"
-            };
+//             const videoInfo = {
+//                 show: showName,         // "The Office (U.S.)"
+//                 episode: episodeNumber, // "E1"
+//                 title: episodeTitle     // "The Dundies"
+//             };
 
-            console.log(videoInfo);
-            // Do something with the videoInfo here
+//             console.log(videoInfo);
+//             // Do something with the videoInfo here
             
-            // If you only need to capture once, disconnect
-            observer.disconnect();
-        }
-    });
+//             // If you only need to capture once, disconnect
+//             observer.disconnect();
+//         }
+//     });
 
-    // Start observing with these options
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true,
-        attributes: true
-    });
-}
+//     // Start observing with these options
+//     observer.observe(document.body, {
+//         childList: true,
+//         subtree: true,
+//         attributes: true
+//     });
+// }
 
-// Call the function to start observing
-getVideoDetails();
+// // Call the function to start observing
+// getVideoDetails();
