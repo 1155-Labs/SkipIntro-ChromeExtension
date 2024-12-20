@@ -6,8 +6,7 @@
   "permissions": ["activeTab", "storage"],
   "host_permissions": [
     "https://www.netflix.com/*",
-    "https://www.hotstar.com/*",
-    "https://*.primevideo.com/*"
+    "https://www.youtube.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -16,17 +15,16 @@
     {
       "matches": [
         "https://www.netflix.com/*",
-        "https://www.hotstar.com/*",
-        "https://*.primevideo.com/*"
+        "https://www.youtube.com/watch?*"
       ],
       "js": ["content.js"]
     }
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_icon": "icon.png"
+    "default_icon": "icon_green.png"
   },
   "icons": {
-    "48": "icon.png"
+    "48": "icon_green.png"
   }
 }
