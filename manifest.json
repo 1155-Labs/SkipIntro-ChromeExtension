@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Skip Intro - No Name Labs",
-  "version": "1.8",
+  "version": "1.9",
   "description": "Automatically skips intros, recaps, and ads on Netflix, Hotstar, Prime Video, YouTube, and more. Compatible with 18+ languages!",
   "permissions": [
     "activeTab",

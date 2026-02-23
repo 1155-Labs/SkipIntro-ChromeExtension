@@ -1,9 +1,9 @@
-// ─── Skip Intro – Content Script v1.8 ───────────────────────────────────────
-// Fixes:
-// 1. YouTube "Hidden" clicks: Filters out elements with display: none / zero size.
-// 2. Coordinate Simulation: Fires events at the exact center of the element.
-// 3. all_frames support: Enabled in manifest to catch nested ad frames.
-// 4. Retry Logic: Respects visibility in every tick.
+// ─── Skip Intro – Content Script v1.9 ───────────────────────────────────────
+// Fixes for YouTube "Unresponsive" buttons:
+// 1. Interactive Check: Refined isElementVisible to handle pointer-events: none.
+// 2. Overlay Bypass: Uses elementFromPoint to find and click whatever is blocking the button.
+// 3. Composed Events: Ensures events reach inside Shadow DOM boundaries.
+// 4. Modern Selectors: Added support for dynamic IDs like [id^='skip-button'].
 
 const SKIP_KEYWORDS = [
   "Skip", "Sauter", "Überspringen", "Saltar", "Pomiń",
@@ -20,7 +20,9 @@ const YOUTUBE_SKIP_SELECTORS = [
   "[class*='skip-ad']",
   "[class*='ad-skip']",
   ".ytp-ad-skip-button-container button",
-  ".ytp-ad-skip-button-slot button"
+  ".ytp-ad-skip-button-slot button",
+  "[id^='skip-button']",
+  ".ytp-ad-skip-button-text"
 ];
 
 const PRIME_SKIP_SELECTORS = [
@@ -77,14 +79,22 @@ function recordSuccess(host) {
 function isElementVisible(el) {
   if (!el) return false;
   const style = window.getComputedStyle(el);
+
+  // Basic visibility
   if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") return false;
+
+  // Interaction block check
+  if (style.pointerEvents === "none") return false;
+
+  // ARIA check
+  if (el.getAttribute("aria-disabled") === "true") return false;
 
   const rect = el.getBoundingClientRect();
   return rect.width > 0 && rect.height > 0;
 }
 
 /**
- * Coordinate-based click simulation
+ * Deep click simulation + Overlay Bypass
  */
 function simulateClick(element) {
   if (!element) return false;
@@ -93,25 +103,44 @@ function simulateClick(element) {
   const x = rect.left + rect.width / 2;
   const y = rect.top + rect.height / 2;
 
+  // Safety: ensure point is within viewport
+  if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) {
+    devLog("ERROR", `Click point (${x}, ${y}) is out of viewport`);
+    return false;
+  }
+
   const events = ["pointerdown", "mousedown", "pointerup", "mouseup", "click"];
   const opts = {
     bubbles: true,
     cancelable: true,
+    composed: true, // Crucial for Shadow DOM
     view: window,
     clientX: x,
     clientY: y,
     screenX: x,
     screenY: y,
-    buttons: 1
+    buttons: 1,
+    detail: 1
   };
 
-  events.forEach(type => {
+  const dispatch = (target, type) => {
     const event = type.startsWith("pointer")
-      ? new PointerEvent(type, { ...opts, pointerId: 1, isPrimary: true })
+      ? new PointerEvent(type, { ...opts, pointerId: 1, isPrimary: true, pressure: 0.5 })
       : new MouseEvent(type, opts);
-    element.dispatchEvent(event);
-  });
+    target.dispatchEvent(event);
+  };
 
+  // Path 1: Targeted click on the element itself
+  events.forEach(type => dispatch(element, type));
+
+  // Path 2: Overlay Bypass - click whatever is AT that point (if it's not the button)
+  const topElement = document.elementFromPoint(x, y);
+  if (topElement && topElement !== element && !element.contains(topElement)) {
+    devLog("CLICK", `Overlay detected: ${topElement.tagName.toLowerCase()} at (${Math.round(x)}, ${Math.round(y)}). Clicking overlay path too.`);
+    events.forEach(type => dispatch(topElement, type));
+  }
+
+  // Path 3: Native click fallback
   if (typeof element.click === "function") {
     element.click();
   }
@@ -128,7 +157,7 @@ function tryClickButton(button, force = false) {
   }
 
   const htmlSnippet = button.outerHTML.substring(0, 100).replace(/\n/g, "");
-  devLog("CLICK", `Attempting click at midpoint on: ${htmlSnippet}...`);
+  devLog("CLICK", `Attempting deep click on: ${htmlSnippet}...`);
 
   const success = simulateClick(button);
   if (success) incrementSkipCount();
@@ -151,7 +180,7 @@ function findYouTubeSkipButton() {
 function startYouTubeRetry() {
   if (ytRetryInterval) return;
 
-  devLog("DETECTION", "YouTube skip button found (visible) — starting retry loop");
+  devLog("DETECTION", "YouTube skip button found (visible/interactive) — starting retry loop");
 
   let attempts = 0;
   const MAX_ATTEMPTS = 50;
@@ -161,7 +190,7 @@ function startYouTubeRetry() {
     const btn = findYouTubeSkipButton();
 
     if (!btn) {
-      devLog("DETECTION", `YT retry: no visible button found after ${attempts} attempts`);
+      devLog("DETECTION", `YT retry: no visible/interactive button found after ${attempts} attempts`);
       clearInterval(ytRetryInterval);
       ytRetryInterval = null;
       return;
@@ -174,13 +203,14 @@ function startYouTubeRetry() {
       return;
     }
 
-    // Force click since we already filtered for visibility in findYouTubeSkipButton
+    // Attempt the click
     const clicked = tryClickButton(btn, true);
 
     if (clicked) {
+      // Check for success soon after
       setTimeout(() => {
         if (!findYouTubeSkipButton()) {
-          devLog("CLICK", "YouTube skip confirmed — visible button gone");
+          devLog("CLICK", "YouTube skip confirmed — button gone");
           clearInterval(ytRetryInterval);
           ytRetryInterval = null;
           recordSuccess("youtube.com");
