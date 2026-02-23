@@ -1,9 +1,9 @@
-// ─── Skip Intro – Content Script v1.9 ───────────────────────────────────────
-// Fixes for YouTube "Unresponsive" buttons:
-// 1. Interactive Check: Refined isElementVisible to handle pointer-events: none.
-// 2. Overlay Bypass: Uses elementFromPoint to find and click whatever is blocking the button.
-// 3. Composed Events: Ensures events reach inside Shadow DOM boundaries.
-// 4. Modern Selectors: Added support for dynamic IDs like [id^='skip-button'].
+// ─── Skip Intro – Content Script v1.9.1 ────────────────────────────────────
+// Fixes:
+// 1. Initialization Race Condition: Restored bootstrap and added a retry cycle.
+// 2. Overlay Bypass: Uses elementFromPoint fallback.
+// 3. Shadow DOM: Composed events for deep penetration.
+// 4. Modern Selectors: Dynamic ID support.
 
 const SKIP_KEYWORDS = [
   "Skip", "Sauter", "Überspringen", "Saltar", "Pomiń",
@@ -80,13 +80,8 @@ function isElementVisible(el) {
   if (!el) return false;
   const style = window.getComputedStyle(el);
 
-  // Basic visibility
   if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") return false;
-
-  // Interaction block check
   if (style.pointerEvents === "none") return false;
-
-  // ARIA check
   if (el.getAttribute("aria-disabled") === "true") return false;
 
   const rect = el.getBoundingClientRect();
@@ -103,9 +98,8 @@ function simulateClick(element) {
   const x = rect.left + rect.width / 2;
   const y = rect.top + rect.height / 2;
 
-  // Safety: ensure point is within viewport
   if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) {
-    devLog("ERROR", `Click point (${x}, ${y}) is out of viewport`);
+    devLog("ERROR", `Click point (${Math.round(x)}, ${Math.round(y)}) is out of viewport`);
     return false;
   }
 
@@ -113,7 +107,7 @@ function simulateClick(element) {
   const opts = {
     bubbles: true,
     cancelable: true,
-    composed: true, // Crucial for Shadow DOM
+    composed: true,
     view: window,
     clientX: x,
     clientY: y,
@@ -130,17 +124,14 @@ function simulateClick(element) {
     target.dispatchEvent(event);
   };
 
-  // Path 1: Targeted click on the element itself
   events.forEach(type => dispatch(element, type));
 
-  // Path 2: Overlay Bypass - click whatever is AT that point (if it's not the button)
   const topElement = document.elementFromPoint(x, y);
   if (topElement && topElement !== element && !element.contains(topElement)) {
-    devLog("CLICK", `Overlay detected: ${topElement.tagName.toLowerCase()} at (${Math.round(x)}, ${Math.round(y)}). Clicking overlay path too.`);
+    devLog("CLICK", `Overlay detected: ${topElement.tagName.toLowerCase()} at (${Math.round(x)}, ${Math.round(y)}). Clicking overlay path.`);
     events.forEach(type => dispatch(topElement, type));
   }
 
-  // Path 3: Native click fallback
   if (typeof element.click === "function") {
     element.click();
   }
@@ -180,7 +171,7 @@ function findYouTubeSkipButton() {
 function startYouTubeRetry() {
   if (ytRetryInterval) return;
 
-  devLog("DETECTION", "YouTube skip button found (visible/interactive) — starting retry loop");
+  devLog("DETECTION", "YouTube skip button found (active) — starting retry loop");
 
   let attempts = 0;
   const MAX_ATTEMPTS = 50;
@@ -190,7 +181,7 @@ function startYouTubeRetry() {
     const btn = findYouTubeSkipButton();
 
     if (!btn) {
-      devLog("DETECTION", `YT retry: no visible/interactive button found after ${attempts} attempts`);
+      devLog("DETECTION", `YT retry: button gone after ${attempts} attempts`);
       clearInterval(ytRetryInterval);
       ytRetryInterval = null;
       return;
@@ -203,11 +194,9 @@ function startYouTubeRetry() {
       return;
     }
 
-    // Attempt the click
     const clicked = tryClickButton(btn, true);
 
     if (clicked) {
-      // Check for success soon after
       setTimeout(() => {
         if (!findYouTubeSkipButton()) {
           devLog("CLICK", "YouTube skip confirmed — button gone");
@@ -254,7 +243,7 @@ function clickSkipButtons() {
       });
     });
     if (clicked) { recordSuccess(host); return; }
-    if (sweepByKeyword("Prime")) recordSuccess(host);
+    sweepByKeyword("Prime") && recordSuccess(host);
   } else if (isHotstar) {
     let clicked = false;
     HOTSTAR_SKIP_SELECTORS.forEach(sel => {
@@ -266,9 +255,9 @@ function clickSkipButtons() {
       });
     });
     if (clicked) { recordSuccess(host); return; }
-    if (sweepByKeyword("Hotstar")) recordSuccess(host);
+    sweepByKeyword("Hotstar") && recordSuccess(host);
   } else {
-    if (sweepByKeyword("Generic")) recordSuccess(host);
+    sweepByKeyword("Generic") && recordSuccess(host);
   }
 }
 
@@ -282,7 +271,7 @@ function sweepByKeyword(label) {
     const kw = SKIP_KEYWORDS.find(k => text.startsWith(k));
     if (kw) {
       if (tryClickButton(btn)) {
-        devLog("CLICK", `[${label}] Keyword match "${kw}" successfully clicked`);
+        devLog("CLICK", `[${label}] Keyword match "${kw}" clicked`);
         found = true;
       }
     }
@@ -312,32 +301,47 @@ function sync() {
   chrome.storage.local.get(["isEnabled", "devMode"], (d) => {
     isEnabled = d.isEnabled !== false;
     devMode = d.devMode !== false;
+    devLog("OBSERVER", `Init — ${window.location.href}`);
     isEnabled ? startObserver() : stopObserver();
   });
 }
 
-chrome.storage.onChanged.addListener(() => sync());
+function initialize(retryCount = 0) {
+  if (!document.body) {
+    if (retryCount < 20) setTimeout(() => initialize(retryCount + 1), 150);
+    return;
+  }
+  sync();
+}
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (msg.type !== "FORCE_SKIP") return;
-  devLog("CLICK", "Force Skip triggered");
+(function bootstrap() {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => initialize(), { once: true });
+  } else {
+    initialize();
+  }
+  window.addEventListener("load", () => initialize(), { once: true });
 
-  let clicked = false;
-  const selectors = [...YOUTUBE_SKIP_SELECTORS, ...PRIME_SKIP_SELECTORS, ...HOTSTAR_SKIP_SELECTORS];
-  selectors.forEach(sel => {
-    document.querySelectorAll(sel).forEach(btn => {
-      if (tryClickButton(btn, true)) clicked = true;
-    });
+  window.addEventListener("yt-navigate-finish", () => {
+    devLog("OBSERVER", "YouTube SPA nav — re-scanning");
+    if (ytRetryInterval) { clearInterval(ytRetryInterval); ytRetryInterval = null; }
+    sync();
   });
 
-  if (!clicked) clicked = sweepByKeyword("Force");
-  sendResponse({ clicked });
-});
+  chrome.storage.onChanged.addListener(() => sync());
 
-window.addEventListener("yt-navigate-finish", () => {
-  devLog("OBSERVER", "YouTube SPA nav — re-scanning");
-  if (ytRetryInterval) { clearInterval(ytRetryInterval); ytRetryInterval = null; }
-  sync();
-});
-
-sync();
+  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+    if (msg.type === "FORCE_SKIP") {
+      devLog("CLICK", "Force Skip triggered");
+      let clicked = false;
+      const selectors = [...YOUTUBE_SKIP_SELECTORS, ...PRIME_SKIP_SELECTORS, ...HOTSTAR_SKIP_SELECTORS];
+      selectors.forEach(sel => {
+        document.querySelectorAll(sel).forEach(btn => {
+          if (tryClickButton(btn, true)) clicked = true;
+        });
+      });
+      if (!clicked) clicked = sweepByKeyword("Force");
+      sendResponse({ clicked });
+    }
+  });
+})();
