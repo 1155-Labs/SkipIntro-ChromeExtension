@@ -1,212 +1,307 @@
-console.log("Skip Intro content script loaded!");
+// ─── Skip Intro – Content Script v1.7 ───────────────────────────────────────
+// Fixes:
+// 1. YouTube "Hidden" clicks: Uses a full event sequence (mousedown -> mouseup -> click)
+// 2. YouTube Selectors: Broadened to catch modern container structures.
+// 3. Debugging: Logs truncated HTML of detected buttons to verify targets.
+// 4. Force Skip: Improved to bypass all checks and try all known strategies.
 
-// List of "Skip" keywords in multiple languages
-const skipKeywords = [
-  "Skip", // English
-  "Sauter", // French
-  "Überspringen", // German
-  "Saltar", // Spanish/Portuguese
-  "Pomiń", // Polish
-  "Preskočiť", // Slovak
-  "Пропустить", // Russian
-  "跳过", // Chinese
-  "건너뛰기", // Korean
-  "スキップ", // Japanese
-  "Doorgaan", // Dutch
-  "Overslaan", // Dutch (alternate)
-  "Přeskočit", // Czech
-  "Hopp over", // Norwegian
-  "Hoppa över", // Swedish
-  "Ignora", // Italian
-  "Przejdź", // Polish (alternate)
-  "Pular" // Portuguese (alternate)
+const SKIP_KEYWORDS = [
+  "Skip", "Sauter", "Überspringen", "Saltar", "Pomiń",
+  "Preskočiť", "Пропустить", "跳过", "건너뛰기", "スキップ",
+  "Doorgaan", "Overslaan", "Přeskočit", "Hopp over",
+  "Hoppa över", "Ignora", "Przejdź", "Pular"
 ];
 
-// Add these utility functions at the top
-function incrementSkipCount() {
-  // update count
-  chrome.storage.local.get(['timesSkipped'], function(result) {
-    const currentCount = result.timesSkipped || 0;
-    chrome.storage.local.set({ 'timesSkipped': currentCount + 1 }, function() {
-      console.log('Skip count updated to:', currentCount + 1);
+// Broadened YouTube selectors
+const YOUTUBE_SKIP_SELECTORS = [
+  ".ytp-skip-ad-button",
+  ".ytp-ad-skip-button",
+  ".ytp-ad-skip-button-modern",
+  ".ytp-skip-intro-button",
+  "[class*='skip-ad']",
+  "[class*='ad-skip']",
+  ".ytp-ad-skip-button-container button",
+  ".ytp-ad-skip-button-slot button"
+];
+
+const PRIME_SKIP_SELECTORS = [
+  ".atvwebplayersdk-skipelement-button",
+  "[class*='skipelement']",
+  ".fu374p9" // Common Prime Video hash-based class
+];
+
+const HOTSTAR_SKIP_SELECTORS = [
+  "[class*='skip' i]",
+  "[data-testid*='skip' i]",
+  "[aria-label*='skip' i]",
+  ".p-ad-skip-button"
+];
+
+// State
+let isEnabled = true;
+let devMode = true;
+const lastSuccessfulClick = {};
+const CLICK_COOLDOWN_MS = 5000;
+let lastRunAt = 0;
+const MIN_INTERVAL_MS = 300;
+let ytRetryInterval = null;
+
+function devLog(category, message) {
+  if (!devMode) return;
+  chrome.storage.local.get(["devLogs"], (data) => {
+    const logs = data.devLogs || [];
+    logs.push({
+      ts: new Date().toISOString(),
+      cat: category,
+      msg: message,
+      url: window.location.href
     });
+    if (logs.length > 500) logs.splice(0, logs.length - 500);
+    chrome.storage.local.set({ devLogs: logs });
   });
 }
 
-function addShowToHistory(showInfo) {
-  chrome.storage.local.get(['skipIntroHistory'], function(result) {
-    const history = result.skipIntroHistory || [];
-    const domain = window.location.hostname;
-    
-    const entry = {
-      show: showInfo,
-      domain: domain,
-      timestamp: new Date().toISOString()
-    };
-    
-    // Add entry if it doesn't exist
-    if (!history.some(h => h.show === showInfo && h.domain === domain)) {
-      history.push(entry);
-      chrome.storage.local.set({ 'skipIntroHistory': history }, function() {
-        console.log('Show history updated:', entry);
-      });
+function incrementSkipCount() {
+  chrome.storage.local.get(["timesSkipped"], (r) => {
+    chrome.storage.local.set({ timesSkipped: (r.timesSkipped || 0) + 1 });
+  });
+}
+
+function recordSuccess(host) {
+  lastSuccessfulClick[host] = Date.now();
+  devLog("CLICK", `Cooldown started for ${host}`);
+}
+
+/**
+ * Robust click simulation
+ * Dispatches a sequence of events to mimic user interaction better.
+ */
+function simulateClick(element) {
+  if (!element) return false;
+
+  const events = ["pointerdown", "mousedown", "pointerup", "mouseup", "click"];
+  const opts = { bubbles: true, cancelable: true, view: window, buttons: 1 };
+
+  events.forEach(type => {
+    const event = type.startsWith("pointer")
+      ? new PointerEvent(type, { ...opts, pointerId: 1, isPrimary: true })
+      : new MouseEvent(type, opts);
+    element.dispatchEvent(event);
+  });
+
+  // Native click as fallback
+  if (typeof element.click === "function") {
+    element.click();
+  }
+
+  return true;
+}
+
+function tryClickButton(button, force = false) {
+  if (!isEnabled && !force) return false;
+  if (!button || !document.body.contains(button)) return false;
+
+  const style = window.getComputedStyle(button);
+  const isVisible = style.display !== "none" && style.visibility !== "hidden";
+
+  if (!force && !isVisible) return false;
+
+  // Log what we're clicking
+  const htmlSnippet = button.outerHTML.substring(0, 100).replace(/\n/g, "");
+  devLog("CLICK", `Attempting click on: ${htmlSnippet}...`);
+
+  const success = simulateClick(button);
+  if (success) incrementSkipCount();
+  return success;
+}
+
+function findYouTubeSkipButton() {
+  const player = document.querySelector(".html5-video-player, #movie_player");
+  const scope = player || document;
+
+  for (const sel of YOUTUBE_SKIP_SELECTORS) {
+    const btn = scope.querySelector(sel);
+    if (btn) return btn;
+  }
+  return null;
+}
+
+function startYouTubeRetry() {
+  if (ytRetryInterval) return;
+
+  devLog("DETECTION", "YouTube skip button found — starting retry loop");
+
+  let attempts = 0;
+  const MAX_ATTEMPTS = 50;
+
+  ytRetryInterval = setInterval(() => {
+    attempts++;
+    const btn = findYouTubeSkipButton();
+
+    if (!btn) {
+      devLog("DETECTION", `YT retry: button gone after ${attempts} attempts`);
+      clearInterval(ytRetryInterval);
+      ytRetryInterval = null;
+      return;
     }
-  });
-}
 
-// Function to check and click "Skip" buttons
-function clickSkipButtons() {
-  if (!document.body) return;
-  
-  const buttons = document.querySelectorAll("button");
-  buttons.forEach((button) => {
-    const buttonText = button.innerText.trim();
-    if (skipKeywords.some((keyword) => buttonText.includes(keyword))) {
-      button.click();
-      incrementSkipCount();
+    if (attempts > MAX_ATTEMPTS) {
+      devLog("ERROR", "YT retry: giving up after 50 attempts");
+      clearInterval(ytRetryInterval);
+      ytRetryInterval = null;
+      return;
+    }
 
+    // On YouTube, we click even if it looks "hidden" (opacity < 1 or small size)
+    // because that's often just the countdown state.
+    const clicked = tryClickButton(btn, true);
 
-
-      console.log(`Clicked: ${buttonText}`);
-
-      const titleElement = document.querySelector('div[data-uia="video-title"]');
-      
-      if (titleElement) {
-        const showName = titleElement.querySelector('h4')?.textContent || '';
-        const episodeNumber = titleElement.querySelector('span:first-of-type')?.textContent || '';
-        const episodeTitle = titleElement.querySelector('span:last-of-type')?.textContent || '';
-
-        const videoInfo = {
-          show: showName,
-          episode: episodeNumber,
-          title: episodeTitle,
-          fullTitle: `${showName} - ${episodeNumber} - ${episodeTitle}`.trim()
-        };
-
-        addShowToHistory(videoInfo);
-
-        console.log('Captured show details:', videoInfo);
-
-      } else {
-        // Fallback to existing method if new structure isn't found
-        const showTitle = document.querySelector('h1')?.textContent || 
-                          document.querySelector('.video-title')?.textContent ||
-                          document.title.split('-')[0].trim();
-        
-        if (showTitle && showTitle !== 'Netflix') {
-          addShowToHistory(showTitle);
-          console.log('Captured show title:', showTitle);
+    if (clicked) {
+      // Check if it's still there after a short delay
+      setTimeout(() => {
+        if (!findYouTubeSkipButton()) {
+          devLog("CLICK", "YouTube skip confirmed — button gone");
+          clearInterval(ytRetryInterval);
+          ytRetryInterval = null;
+          recordSuccess("youtube.com");
         }
-      }
-      
+      }, 500);
     }
-  });
+  }, 600);
 }
 
-// Function to initialize the observer with retry mechanism
-function initializeObserver(retryCount = 0) {
-  const maxRetries = 10;
-  const retryInterval = 100; // 100ms between retries
+function clickSkipButtons() {
+  const now = Date.now();
+  if (now - lastRunAt < MIN_INTERVAL_MS) return;
+  lastRunAt = now;
 
-  if (!document.body && retryCount < maxRetries) {
-    console.log(`Attempt ${retryCount + 1}: Body not ready, retrying in ${retryInterval}ms...`);
-    setTimeout(() => initializeObserver(retryCount + 1), retryInterval);
+  if (!isEnabled || !document.body) return;
+
+  const host = window.location.hostname;
+  const isYouTube = host.includes("youtube.com");
+  const isHotstar = host.includes("hotstar.com");
+  const isPrime = host.includes("primevideo.com") || host.includes("amazon.com");
+
+  // YouTube logic
+  if (isYouTube) {
+    const btn = findYouTubeSkipButton();
+    if (btn) {
+      startYouTubeRetry();
+    }
     return;
   }
 
-  // Start observing the body for DOM changes
-  const observer = new MutationObserver(() => {
-    clickSkipButtons();
-  });
+  // Cooldown check for others
+  const lastSuccess = lastSuccessfulClick[host] || 0;
+  if (now - lastSuccess < CLICK_COOLDOWN_MS) return;
 
-  try {
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true, // Added to catch more changes
-      characterData: true // Added to catch text changes
+  // Prime
+  if (isPrime) {
+    let clicked = false;
+    PRIME_SKIP_SELECTORS.forEach(sel => {
+      document.querySelectorAll(sel).forEach(btn => {
+        if (tryClickButton(btn)) {
+          devLog("CLICK", `Prime clicked selector: ${sel}`);
+          clicked = true;
+        }
+      });
     });
+    if (clicked) { recordSuccess(host); return; }
+    if (sweepByKeyword("Prime")) recordSuccess(host);
+  }
 
-    // Initial check for buttons
-    clickSkipButtons();
-    console.log("MutationObserver started successfully");
-  } catch (error) {
-    console.error("Error starting observer:", error);
-    if (retryCount < maxRetries) {
-      setTimeout(() => initializeObserver(retryCount + 1), retryInterval);
-    }
+  // Hotstar
+  else if (isHotstar) {
+    let clicked = false;
+    HOTSTAR_SKIP_SELECTORS.forEach(sel => {
+      document.querySelectorAll(sel).forEach(btn => {
+        if (tryClickButton(btn)) {
+          devLog("CLICK", `Hotstar clicked selector: ${sel}`);
+          clicked = true;
+        }
+      });
+    });
+    if (clicked) { recordSuccess(host); return; }
+    if (sweepByKeyword("Hotstar")) recordSuccess(host);
+  }
+
+  // Generic
+  else {
+    if (sweepByKeyword("Generic")) recordSuccess(host);
   }
 }
 
-// Modified initialization
-(function() {
-  console.log("Skip Intro initialization starting...");
-  
-  // Force immediate execution
-  try {
-    console.log("Attempting immediate initialization");
-    initializeObserver();
-  } catch (e) {
-    console.error("Immediate initialization failed:", e);
-  }
-
-  // More robust event listeners with logging
-  const initEvents = ['load', 'DOMContentLoaded'];
-  initEvents.forEach(event => {
-    window.addEventListener(event, () => {
-      console.log(`Initializing on ${event} event`);
-      initializeObserver();
-    }, { once: true }); // Ensure each event only fires once
-  });
-  
-  // Document ready state handling
-  const handleReadyState = () => {
-    console.log(`Document readyState: ${document.readyState}`);
-    if (document.readyState === 'interactive' || document.readyState === 'complete') {
-      initializeObserver();
+function sweepByKeyword(label) {
+  let found = false;
+  const buttons = document.querySelectorAll("button, [role='button'], .ytp-ad-skip-button-text, .atvwebplayersdk-skipelement-button");
+  buttons.forEach(btn => {
+    const text = (btn.innerText || btn.textContent || "").trim();
+    if (!text) return;
+    const kw = SKIP_KEYWORDS.find(k => text.startsWith(k));
+    if (kw) {
+      if (tryClickButton(btn)) {
+        devLog("CLICK", `[${label}] Keyword match "${kw}" successfully clicked`);
+        found = true;
+      }
     }
-  };
+  });
+  return found;
+}
 
-  // Check ready state immediately
-  handleReadyState();
-  
-  // Listen for ready state changes
-  document.addEventListener('readystatechange', handleReadyState);
+// Observer & Polling
+let observer = null;
+let pollTimer = null;
 
-  console.log("Skip Intro initialization handlers set up complete");
-})();
+function startObserver() {
+  if (observer) return;
+  observer = new MutationObserver(() => clickSkipButtons());
+  observer.observe(document.documentElement, {
+    childList: true, subtree: true, attributes: true, attributeFilter: ["hidden", "aria-hidden", "data-state", "class"]
+  });
+  pollTimer = setInterval(clickSkipButtons, 1000);
+  clickSkipButtons();
+}
 
-// function getVideoDetails() {
-//     const targetNode = document.querySelector('div[data-uia="video-title"]');
-    
-//     const observer = new MutationObserver((mutations) => {
-//         const titleElement = document.querySelector('div[data-uia="video-title"]');
-//         if (titleElement) {
-//             const showName = titleElement.querySelector('h4')?.textContent || '';
-//             const episodeNumber = titleElement.querySelector('span:first-of-type')?.textContent || '';
-//             const episodeTitle = titleElement.querySelector('span:last-of-type')?.textContent || '';
+function stopObserver() {
+  if (observer) { observer.disconnect(); observer = null; }
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+}
 
-//             const videoInfo = {
-//                 show: showName,         // "The Office (U.S.)"
-//                 episode: episodeNumber, // "E1"
-//                 title: episodeTitle     // "The Dundies"
-//             };
+// Init & Settings
+function sync() {
+  chrome.storage.local.get(["isEnabled", "devMode"], (d) => {
+    isEnabled = d.isEnabled !== false;
+    devMode = d.devMode !== false;
+    isEnabled ? startObserver() : stopObserver();
+  });
+}
 
-//             console.log(videoInfo);
-//             // Do something with the videoInfo here
-            
-//             // If you only need to capture once, disconnect
-//             observer.disconnect();
-//         }
-//     });
+chrome.storage.onChanged.addListener(() => sync());
 
-//     // Start observing with these options
-//     observer.observe(document.body, {
-//         childList: true,
-//         subtree: true,
-//         attributes: true
-//     });
-// }
+// Force Skip from popup
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg.type !== "FORCE_SKIP") return;
+  devLog("CLICK", "Force Skip triggered");
 
-// // Call the function to start observing
-// getVideoDetails();
+  // Bypass everything
+  let clicked = false;
+  const selectors = [...YOUTUBE_SKIP_SELECTORS, ...PRIME_SKIP_SELECTORS, ...HOTSTAR_SKIP_SELECTORS];
+  selectors.forEach(sel => {
+    document.querySelectorAll(sel).forEach(btn => {
+      if (tryClickButton(btn, true)) clicked = true;
+    });
+  });
+
+  if (!clicked) clicked = sweepByKeyword("Force");
+
+  sendResponse({ clicked });
+});
+
+// YouTube SPA Navigation
+window.addEventListener("yt-navigate-finish", () => {
+  devLog("OBSERVER", "YouTube SPA nav — re-scanning");
+  if (ytRetryInterval) { clearInterval(ytRetryInterval); ytRetryInterval = null; }
+  sync();
+});
+
+sync();

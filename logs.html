@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <title>Skip Intro – Dev Logs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;600;700&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+
+      --observer: #388bfd;
+      --detection: #3fb950;
+      --click: #d2a8ff;
+      --toggle: #ffa657;
+      --error: #f85149;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    header h1 {
+      font-size: 16px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    header h1 span {
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    button {
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #0d1117;
+      border-color: var(--accent);
+    }
+
+    .btn-primary:hover {
+      opacity: 0.85;
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-muted);
+    }
+
+    .btn-ghost:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .btn-copy {
+      background: rgba(88, 166, 255, 0.1);
+      color: var(--accent);
+      border-color: rgba(88, 166, 255, 0.3);
+    }
+
+    .btn-copy:hover {
+      background: rgba(88, 166, 255, 0.2);
+    }
+
+    .btn-copy.copied {
+      background: rgba(63, 185, 80, 0.15);
+      color: var(--detection);
+      border-color: rgba(63, 185, 80, 0.3);
+    }
+
+    .btn-danger {
+      background: transparent;
+      color: var(--error);
+      border-color: var(--error);
+    }
+
+    .btn-danger:hover {
+      background: rgba(248, 81, 73, 0.1);
+    }
+
+    .filters {
+      display: flex;
+      gap: 8px;
+      padding: 12px 24px;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .filter-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-right: 4px;
+    }
+
+    .chip {
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 20px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.15s;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-muted);
+    }
+
+    .chip.active {
+      color: #0d1117;
+      border-color: transparent;
+    }
+
+    .chip[data-cat="ALL"].active {
+      background: var(--text-muted);
+    }
+
+    .chip[data-cat="OBSERVER"].active {
+      background: var(--observer);
+    }
+
+    .chip[data-cat="DETECTION"].active {
+      background: var(--detection);
+    }
+
+    .chip[data-cat="CLICK"].active {
+      background: var(--click);
+    }
+
+    .chip[data-cat="TOGGLE"].active {
+      background: var(--toggle);
+    }
+
+    .chip[data-cat="ERROR"].active {
+      background: var(--error);
+    }
+
+    .log-count {
+      margin-left: auto;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    #log-container {
+      padding: 12px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .log-entry {
+      display: grid;
+      grid-template-columns: 160px 90px 1fr;
+      gap: 12px;
+      align-items: start;
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      font-size: 13px;
+      transition: background 0.1s;
+    }
+
+    .log-entry:hover {
+      background: var(--surface);
+      border-color: var(--border);
+    }
+
+    .log-ts {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .log-cat {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      padding: 2px 8px;
+      border-radius: 4px;
+      text-align: center;
+      width: fit-content;
+    }
+
+    .log-cat.OBSERVER {
+      background: rgba(56, 139, 253, 0.15);
+      color: var(--observer);
+    }
+
+    .log-cat.DETECTION {
+      background: rgba(63, 185, 80, 0.15);
+      color: var(--detection);
+    }
+
+    .log-cat.CLICK {
+      background: rgba(210, 168, 255, 0.15);
+      color: var(--click);
+    }
+
+    .log-cat.TOGGLE {
+      background: rgba(255, 166, 87, 0.15);
+      color: var(--toggle);
+    }
+
+    .log-cat.ERROR {
+      background: rgba(248, 81, 73, 0.15);
+      color: var(--error);
+    }
+
+    .log-msg {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--text);
+      word-break: break-word;
+      line-height: 1.5;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 24px;
+      color: var(--text-muted);
+    }
+
+    .empty-state h2 {
+      font-size: 18px;
+      margin-bottom: 8px;
+    }
+
+    .empty-state p {
+      font-size: 14px;
+    }
+
+    #live-badge {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--detection);
+      animation: pulse 1.5s infinite;
+      display: inline-block;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.3;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>
+      <span id="live-badge"></span>
+      Skip Intro <span>/ Dev Logs</span>
+    </h1>
+    <div class="header-actions">
+      <button class="btn-ghost" id="btn-refresh">↻ Refresh</button>
+      <button class="btn-copy" id="btn-copy">📋 Copy All</button>
+      <button class="btn-danger" id="btn-clear">Clear Logs</button>
+      <button class="btn-primary" id="btn-auto">Auto ✓</button>
+    </div>
+  </header>
+
+  <div class="filters">
+    <span class="filter-label">Filter:</span>
+    <div class="chip active" data-cat="ALL">All</div>
+    <div class="chip" data-cat="OBSERVER">OBSERVER</div>
+    <div class="chip" data-cat="DETECTION">DETECTION</div>
+    <div class="chip" data-cat="CLICK">CLICK</div>
+    <div class="chip" data-cat="TOGGLE">TOGGLE</div>
+    <div class="chip" data-cat="ERROR">ERROR</div>
+    <span class="log-count" id="log-count">0 entries</span>
+  </div>
+
+  <div id="log-container">
+    <div class="empty-state">
+      <h2>No logs yet</h2>
+      <p>Open YouTube, Prime Video, or Hotstar with Dev Mode enabled to start seeing logs here.</p>
+    </div>
+  </div>
+
+  <script src="./js/logs.js"></script>
+</body>
+
+</html>

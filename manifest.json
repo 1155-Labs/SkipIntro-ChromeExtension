@@ -1,12 +1,19 @@
 {
   "manifest_version": 3,
   "name": "Skip Intro - No Name Labs",
-  "version": "1.2",
-  "description": "Automatically skips intros, recaps, and ads on Netflix, Hotstar, Prime Video, and more. Now compatible with multiple languages!",
-  "permissions": ["activeTab", "storage"],
+  "version": "1.4",
+  "description": "Automatically skips intros, recaps, and ads on Netflix, Hotstar, Prime Video, YouTube, and more. Compatible with 18+ languages!",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "tabs"
+  ],
   "host_permissions": [
     "https://www.netflix.com/*",
-    "https://www.youtube.com/*"
+    "https://www.youtube.com/*",
+    "https://www.hotstar.com/*",
+    "https://www.primevideo.com/*",
+    "https://www.amazon.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -15,9 +22,15 @@
     {
       "matches": [
         "https://www.netflix.com/*",
-        "https://www.youtube.com/watch?*"
+        "https://www.youtube.com/watch?*",
+        "https://www.hotstar.com/*",
+        "https://www.primevideo.com/*",
+        "https://www.amazon.com/gp/video/*"
       ],
-      "js": ["content.js"]
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
     }
   ],
   "action": {
@@ -26,5 +39,17 @@
   },
   "icons": {
     "48": "icon_green.png"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "logs.html",
+        "js/logs.js",
+        "css/styles.css"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ]
 }

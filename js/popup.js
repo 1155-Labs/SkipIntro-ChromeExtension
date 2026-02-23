@@ -4,84 +4,43 @@ document.addEventListener("DOMContentLoaded", () => {
   const miscValue = document.getElementById("misc-value");
   const miscValueText = document.getElementById("misc-value-text");
   const mainLogo = document.getElementById("main-logo");
-  
 
-  
-  
-  
-  
-  
-  // const videosOdometer = document.querySelector(".videos-odometer");
-  // createOdometer(videosOdometer, 790);
-  
-  // const projectsOdometer = document.querySelector(".projects-odometer");
-  // createOdometer(projectsOdometer, 89);
+  // Dev tools elements
+  const devToolsPanel = document.getElementById("dev-tools");
+  const devModeFooter = document.getElementById("dev-mode-footer");
+  const devModeIndicator = document.getElementById("dev-mode-indicator");
+  const devModeLabel = document.getElementById("dev-mode-label");
+  const observerStatusText = document.getElementById("observer-status-text");
+  const forceSkipStatus = document.getElementById("force-skip-status");
+  const btnForceSkip = document.getElementById("btn-force-skip");
+  const btnOpenLogs = document.getElementById("btn-open-logs");
 
-  
-function firstLoad(){
-  console.log("first user");
-  miscValue.innerHTML = '2,32,632' + "+";
-
+  // ── Skip count display ─────────────────────────────────────────────────────
+  function firstLoad() {
+    miscValue.innerHTML = "2,32,632+";
     miscValueText.textContent = "currently active users";
+  }
 
-  // actives users
-  
-  // remoteWrapper.style.background = "linear-gradient(180deg, #C8D9AF 0%, #F1E6BA 100%)";
-  // toggleButtonWrapper.style.justifyContent = "flex-start";
-}
-// } 
-// const createOdometer = (el, value) => {
-//   const odometer = new Odometer({
-//     el: el,
-//     value: 0,
-//   });
+  function regularLoad() {
+    chrome.storage.local.get(["timesSkipped"], (data) => {
+      miscValue.innerHTML = (data.timesSkipped || 0) + "+";
+      miscValueText.textContent = "times skipped for you";
+    });
+  }
 
-//   let hasRun = false;
-
-//   const options = {
-//     threshold: [0, 0.9],
-//   };
-
-//   const callback = (entries, observer) => {
-//     entries.forEach((entry) => {
-//       if (entry.isIntersecting) {
-//         if (!hasRun) {
-//           odometer.update(value);
-//           hasRun = true;
-//         }
-//       }
-//     });
-//   };
-
-//   const observer = new IntersectionObserver(callback, options);
-//   observer.observe(el);
-// };
-
-function regularLoad(){
-  console.log("recurring user");
-
-  
-  
-  chrome.storage.local.get(["timesSkipped"], (data) => {
-    console.log(data);
-    // createOdometer(miscValue, data.timesSkipped);
-    // miscValue.textContent = "+"+ data.timesSkipped;
-    miscValue.innerHTML = data.timesSkipped + "+";
-
-    miscValueText.textContent = "times skipped for you";
-  });
-} 
-
-  // Check if elements exist
+  // ── Toggle switch ──────────────────────────────────────────────────────────
   if (!toggleButtonWrapper) {
     console.error("Required elements not found in popup.html");
     return;
   }
 
-  // Load both isEnabled and firstOpen states with isEnabled defaulting to true
-  chrome.storage.local.get(["isEnabled", "firstOpen"], (data) => {
-    const isEnabled = !!data.isEnabled;
-    
+  function applyToggleState(isEnabled) {
+    toggleButtonWrapper.style.justifyContent = isEnabled ? "flex-end" : "flex-start";
+  }
+
+  chrome.storage.local.get(["isEnabled", "firstOpen", "devMode"], (data) => {
+    const isEnabled = data.isEnabled !== false;
+
     if (data.firstOpen) {
       firstLoad();
       chrome.storage.local.set({ firstOpen: false });
@@ -89,43 +48,78 @@ function regularLoad(){
       regularLoad();
     }
 
-    toggleButtonWrapper.style.justifyContent = isEnabled ? "flex-end" : "flex-start";
+    applyToggleState(isEnabled);
+    applyDevMode(data.devMode !== false);
   });
 
-  
-  
-  // Add event listener to toggle-button-wrapper
-  toggleButtonWrapper.addEventListener("click", toggleSwitch);
-
-
-  // Define the toggleSwitch function
-  function toggleSwitch() {
-    console.log("Toggle switch function called");
-    console.log(toggleButtonWrapper.style.justifyContent);
-    
-    // Toggle state on button click
-      chrome.storage.local.get(["isEnabled"], (data) => {
-        const newState = !data.isEnabled;
-        chrome.storage.local.set({ isEnabled: newState }, () => {
-          // statusText.textContent = newState ? "Enabled" : "Disabled";
-          // toggleButton.textContent = newState ? "Disable" : "Enable";
-          if(newState) { //on
-            toggleButtonWrapper.style.justifyContent = "flex-end";
-            remoteWrapper.style.background = "linear-gradient(180deg, #E695AB 0%, #E7B199 100%)";
-            mainLogo.style.background = "./assets/remote/darkmode/logo_dark_mode_on.png";
-            toggleButtonWrapper.style.backgroundImage = "url('../assets/remote/darkmode/switch_on_bg.png')";
-          } else { // off
-            toggleButtonWrapper.style.justifyContent = "flex-start";
-            remoteWrapper.style.background = "linear-gradient(180deg, #96AFE6 0%, #9B96E6 100%)";
-            mainLogo.style.background = "../assets/remote/darkmode/logo_dark_mode.png";
-            toggleButtonWrapper.style.backgroundImage = "url('../assets/remote/darkmode/switch_off_bg.png')";
-          }
-          
-        });
-
+  toggleButtonWrapper.addEventListener("click", () => {
+    chrome.storage.local.get(["isEnabled"], (data) => {
+      const newState = !data.isEnabled;
+      chrome.storage.local.set({ isEnabled: newState }, () => {
+        if (newState) {
+          toggleButtonWrapper.style.justifyContent = "flex-end";
+          remoteWrapper.style.background = "linear-gradient(180deg, #E695AB 0%, #E7B199 100%)";
+          toggleButtonWrapper.style.backgroundImage = "url('../assets/remote/darkmode/switch_on_bg.png')";
+        } else {
+          toggleButtonWrapper.style.justifyContent = "flex-start";
+          remoteWrapper.style.background = "linear-gradient(180deg, #96AFE6 0%, #9B96E6 100%)";
+          toggleButtonWrapper.style.backgroundImage = "url('../assets/remote/darkmode/switch_off_bg.png')";
+        }
       });
+    });
+  });
 
-    
-   }
+  // ── Dev Mode ───────────────────────────────────────────────────────────────
+  function applyDevMode(enabled) {
+    devModeIndicator.classList.toggle("on", enabled);
+    devModeLabel.textContent = enabled ? "DEV MODE ON" : "DEV MODE OFF";
+    devToolsPanel.classList.toggle("visible", enabled);
+
+    if (enabled) {
+      observerStatusText.textContent = "Observer running";
+    }
+  }
+
+  devModeFooter.addEventListener("click", () => {
+    chrome.storage.local.get(["devMode"], (data) => {
+      const newVal = !(data.devMode !== false);
+      chrome.storage.local.set({ devMode: newVal }, () => applyDevMode(newVal));
+    });
+  });
+
+  // ── Force Skip ─────────────────────────────────────────────────────────────
+  btnForceSkip.addEventListener("click", () => {
+    forceSkipStatus.textContent = "⏳ Looking for skip button…";
+    btnForceSkip.disabled = true;
+
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (!tabs || !tabs[0]) {
+        forceSkipStatus.textContent = "❌ No active tab found";
+        btnForceSkip.disabled = false;
+        return;
+      }
+
+      chrome.tabs.sendMessage(tabs[0].id, { type: "FORCE_SKIP" }, (response) => {
+        btnForceSkip.disabled = false;
+
+        if (chrome.runtime.lastError) {
+          forceSkipStatus.textContent = "❌ Content script not running on this page";
+          return;
+        }
+
+        if (response?.clicked) {
+          forceSkipStatus.textContent = "✅ Clicked! Check logs for details.";
+        } else {
+          forceSkipStatus.textContent = "⚠️ No skip button found — check logs";
+        }
+
+        setTimeout(() => { forceSkipStatus.textContent = ""; }, 4000);
+      });
+    });
+  });
+
+  // ── Open Logs page ─────────────────────────────────────────────────────────
+  btnOpenLogs.addEventListener("click", () => {
+    chrome.tabs.create({ url: chrome.runtime.getURL("logs.html") });
+  });
 });
-
